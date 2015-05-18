@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:tx="http://www.springframework.org/schema/tx" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:jpa="http://www.springframework.org/schema/data/jpa"
+	xsi:schemaLocation="
+            http://www.springframework.org/schema/beans 
+            http://www.springframework.org/schema/beans/spring-beans.xsd
+            http://www.springframework.org/schema/aop 
+            http://www.springframework.org/schema/aop/spring-aop.xsd
+            http://www.springframework.org/schema/tx 
+            http://www.springframework.org/schema/tx/spring-tx.xsd
+            http://www.springframework.org/schema/context 
+            http://www.springframework.org/schema/context/spring-context.xsd 
+            http://www.springframework.org/schema/data/jpa
+			http://www.springframework.org/schema/data/jpa/spring-jpa.xsd">
+
+
+	<context:annotation-config />
+	<!-- 扫描指定的包中的类上的注解 -->
+	<context:component-scan base-package="cn.c.**.service" />
+	<!-- 配置Spring Data JPA扫描目录 -->
+	<jpa:repositories base-package="cn.c.**.repository" />
+
+	<!-- 导入src目录下的jdbc.properties文件 -->
+	<context:property-placeholder location="classpath:jdbc.properties" />
+
+	<bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource"
+		destroy-method="close">
+		<property name="driverClassName" value="${jdbc.driverClassName}" />
+		<property name="url" value="${jdbc.url}" />
+		<property name="username" value="${jdbc.username}" />
+		<property name="password" value="${jdbc.password}" />
+		<!-- 配置连接池的初始值 -->
+		<property name="initialSize" value="1" />
+		<!-- 连接池的最大值 -->
+		<property name="maxActive" value="80" />
+		<!-- 最大等待毫秒数, 单位为 ms, 超过时间会出错误信息 -->
+		<property name="maxWait" value="3000" />
+		<!-- 当最小空闲时，当连接少于minIdle时会自动去申请一些连接 -->
+		<property name="minIdle" value="1" />
+		<!-- 最大空闲时，当经过一个高峰之后，连接池可以将一些用不到的连接释放，一直减少到maxIdle为止 -->
+		<property name="maxIdle" value="20" />
+
+	</bean>
+
+	<!-- Hibernate对Jpa的实现 -->
+	<bean id="hibernateJpaVendorAdapter"
+		class="org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter" />
+
+
+	<!-- 定义实体管理器工厂 -->
+	<bean id="entityManagerFactory" class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean">
+
+		<!-- 使用 persistence.xml 初始化entityManagerFactory -->
+		<!-- <property name="persistenceUnitName" value="jpa" /> -->
+
+		<!-- 指定数据源 -->
+		<property name="dataSource" ref="dataSource" />
+		<!-- 指定Jpa持久化实现厂商类,这里以Hibernate为例 -->
+		<property name="jpaVendorAdapter" ref="hibernateJpaVendorAdapter" />
+		
+		<property name="persistenceUnitPostProcessors">
+			<list>
+				<bean class="org.springframework.data.jpa.support.ClasspathScanningPersistenceUnitPostProcessor">
+					<constructor-arg value="cn.c.module.file.domain" />
+					<property name="mappingFileNamePattern" value="**/*Mapping.xml" />
+				</bean>
+			</list>
+		</property>
+		
+		<!-- 指定Entity实体类包路径 -->
+		<property name="packagesToScan">
+			<array>
+				<value>cn.c.**.model</value>
+				<value>cn.c.**.domain</value>
+			</array>
+		</property>
+		
+		<!-- 指定JPA属性；如Hibernate中指定是否显示SQL的是否显示、方言等 -->
+		<property name="jpaProperties">
+			<props>
+				<prop key="hibernate.dialect">${jdbc.dialect}</prop>
+				<prop key="hibernate.hbm2ddl.auto">update</prop>
+				<!-- 根据驼峰标识在大写字母签加 _ -->
+				<!-- <prop key="hibernate.ejb.naming_strategy">org.hibernate.cfg.ImprovedNamingStrategy</prop> -->
+				<prop key="hibernate.current_session_context_class">thread</prop>
+				<prop key="hibernate.cache.provider_class">org.hibernate.cache.NoCacheProvider</prop>
+				<prop key="hibernate.show_sql">${jdbc.showSql}</prop>
+				<prop key="hibernate.format_sql">false</prop>
+
+			</props>
+			
+		</property>
+
+	</bean>
+	
+	<bean id="sessionFactory" class="org.springframework.orm.jpa.vendor.HibernateJpaSessionFactoryBean">
+		<property name="entityManagerFactory" ref="entityManagerFactory"/>
+	</bean>
+	
+	<!-- 配置事务管理器 -->
+	<bean id="transactionManager" class="org.springframework.orm.jpa.JpaTransactionManager">
+		<property name="entityManagerFactory" ref="entityManagerFactory" />
+	</bean>
+	
+	<!-- 启用 annotation事务 -->
+	<tx:annotation-driven transaction-manager="transactionManager" />
+	
+	<aop:config>
+		<aop:pointcut id="txPointcut" expression="execution(* cn.c..service..*.*(..))" />
+		<aop:advisor pointcut-ref="txPointcut" advice-ref="txCoreAdvice"/>
+		
+		<!-- 请保持该事务在最后,因为他会支持当前已有事务，如果当前没有事务，就新建一个事务。 -->
+		<aop:advisor pointcut-ref="txPointcut" advice-ref="txDefaultAdvice"/>
+	</aop:config>
+	
+	<tx:advice id="txDefaultAdvice" transaction-manager="transactionManager">
+		<tx:attributes>
+			<tx:method name="get*" propagation="REQUIRED" read-only="true" />
+			<tx:method name="find*" propagation="REQUIRED" read-only="true" />
+			<tx:method name="*" propagation="REQUIRED" />
+		</tx:attributes>
+	</tx:advice>
+	
+	<!-- core模块 Service事务管理 -->
+	<import resource="classpath:/springConfig-core-transaction.xml"/>
+
+</beans>

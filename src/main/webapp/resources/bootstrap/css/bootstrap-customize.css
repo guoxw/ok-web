@@ -1,0 +1,28 @@
+.table td.lable {
+	text-align: right;
+	vertical-align: middle;
+	
+}
+.table td.input {
+	text-align: left;
+	vertical-align: middle;
+	
+	padding: 5px;
+}
+
+.table-fixed {
+	table-layout:fixed;
+}
+
+textarea.notNull,
+input.notNull {
+	border-color: #FF0000;
+}
+
+textarea.readOnly,
+input.readOnly {
+ 	/*border-color: #0099CC;*/
+	background-color: #DDF2FF
+}
+
+
